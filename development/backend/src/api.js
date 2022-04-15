@@ -9,6 +9,30 @@ const sprint = (name) => {
   console.log(`${Date.now()}: ${name}`);
 };
 
+const readFilePromise = (path) => {
+  return new Promise((res, rej) => {
+    fs.readFile(path, (err, data) => {
+      if (err) {
+        rej(err);
+      } else {
+        res(data);
+      }
+    });
+  });
+}
+
+const writeFilePromise = (path, binary) => {
+  return new Promise((res, rej) => {
+    fs.writeFile(path, binary, (err) => {
+      if (err) {
+        rej(err);
+      } else {
+        res();
+      }
+    });
+  });
+}
+
 // MEMO: 設定項目はここを参考にした
 // https://github.com/sidorares/node-mysql2#api-and-configuration
 // https://github.com/mysqljs/mysql
@@ -607,34 +631,32 @@ const postFiles = async (req, res) => {
 
   const base64Data = req.body.data;
   // mylog(base64Data);
-
   const name = req.body.name;
-
   const newId = uuidv4();
   const newThumbId = uuidv4();
-
   const binary = Buffer.from(base64Data, 'base64');
-
-  fs.writeFileSync(`${filePath}${newId}_${name}`, binary);
-
-  const image = await jimp.read(fs.readFileSync(`${filePath}${newId}_${name}`));
-  mylog(image.bitmap.width);
-  mylog(image.bitmap.height);
+  const [dummy, image] = await Promise.all([
+    writeFilePromise(`${filePath}${newId}_${name}`, binary),
+    jimp.read(binary),
+  ]);
+  // mylog(image.bitmap.width);
+  // mylog(image.bitmap.height);
 
   const size = image.bitmap.width < image.bitmap.height ? image.bitmap.width : image.bitmap.height;
   await image.cover(size, size);
 
   await image.writeAsync(`${filePath}${newThumbId}_thumb_${name}`);
 
-  await pool.query(
-    `insert into file (file_id, path, name)
-        values (?, ?, ?)`,
-    [`${newId}`, `${filePath}${newId}_${name}`, `${name}`],
-  );
-  await pool.query(
-    `insert into file (file_id, path, name)
-        values (?, ?, ?)`,
-    [`${newThumbId}`, `${filePath}${newThumbId}_thumb_${name}`, `thumb_${name}`],
+  await pool.query(`
+    insert into file (file_id, path, name)
+      values
+        (?, ?, ?),
+        (?, ?, ?)
+    `,
+    [
+      `${newId}`, `${filePath}${newId}_${name}`, `${name}`,
+      `${newThumbId}`, `${filePath}${newThumbId}_thumb_${name}`, `thumb_${name}`,
+    ],
   );
 
   res.send({ fileId: newId, thumbFileId: newThumbId });
@@ -674,7 +696,7 @@ const getRecordItemFile = async (req, res) => {
 
   const fileInfo = rows[0];
 
-  const data = fs.readFileSync(fileInfo.path);
+  const data = await readFilePromise(fileInfo.path);
   const base64 = data.toString('base64');
   // mylog(base64);
 
@@ -715,7 +737,7 @@ const getRecordItemFileThumbnail = async (req, res) => {
 
   const fileInfo = rows[0];
 
-  const data = fs.readFileSync(fileInfo.path);
+  const data = await readFilePromise(fileInfo.path);
   const base64 = data.toString('base64');
   // mylog(base64);
 
