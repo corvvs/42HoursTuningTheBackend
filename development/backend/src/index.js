@@ -30,7 +30,8 @@ app.get('/api/client/records/:recordId', async (req, res, next) => {
 
 app.get('/api/client/record-views/tomeActive', async (req, res, next) => {
   try {
-    await api.tomeActive(req, res);
+    await api.acquireRecords(req, res, "open", "tome");
+    // await api.tomeActive(req, res);
   } catch(e) {
     console.log(e);
     next(new Error("Unexpect"));

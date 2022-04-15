@@ -233,48 +233,61 @@ const tomeActive = async (req, res) => {
     limit = 10;
   }
 
-  ///////////////////////////////////////////////////////////////
-  
-  const myGroupIds = await (async () => {
-    const searchMyGroupQs = `select group_id from group_member where user_id = ?`;
-    const [myGroupResult] = await pool.query(searchMyGroupQs, [user.user_id]);
-    return myGroupResult.map(r => r.group_id);
-  })();
-  const targetCategoryAppGroupList = [];
-  const searchTargetQs = `select * from category_group where group_id in (?)`;
-  const [targetResult] = await pool.query(searchTargetQs, [myGroupIds]);
-  for (let j = 0; j < targetResult.length; j++) {
-    const targetLine = targetResult[j];
+  const {
+    searchRecordQs, searchRecordQsParams,
+    recordCountQs, recordCountQsParams,
+  } = await (async () => {
+    const searchRecordQsCoreParams = ["open"];
+    let searchRecordQsCore = `from record
+      where status = ?`
 
-    targetCategoryAppGroupList.push({
-      categoryId: targetLine.category_id,
-      applicationGroup: targetLine.application_group,
-    });
-  }
-
-  let searchRecordQsCore = `from record where status = ? and (category_id, application_group) in (`;
-  const core_param = ["open"];
-  for (let i = 0; i < targetCategoryAppGroupList.length; i++) {
-    if (i !== 0) {
-      searchRecordQsCore += ', (?, ?)';
-    } else {
-      searchRecordQsCore += ' (?, ?)';
+    ///////////////////////////////////////////////////////////////
+    const myGroupIds = await (async () => {
+      const searchMyGroupQs = `select group_id from group_member where user_id = ?`;
+      const [myGroupResult] = await pool.query(searchMyGroupQs, [user.user_id]);
+      return myGroupResult.map(r => r.group_id);
+    })();
+    const targetCategoryAppGroupList = [];
+    const searchTargetQs = `select * from category_group where group_id in (?)`;
+    const [targetResult] = await pool.query(searchTargetQs, [myGroupIds]);
+    for (let j = 0; j < targetResult.length; j++) {
+      const targetLine = targetResult[j];
+      targetCategoryAppGroupList.push({
+        categoryId: targetLine.category_id,
+        applicationGroup: targetLine.application_group,
+      });
     }
-    core_param.push(targetCategoryAppGroupList[i].categoryId);
-    core_param.push(targetCategoryAppGroupList[i].applicationGroup);
-  }
-  searchRecordQsCore += ' )';
+    searchRecordQsCore += ` and (category_id, application_group) in (`;
+    for (let i = 0; i < targetCategoryAppGroupList.length; i++) {
+      if (i !== 0) {
+        searchRecordQsCore += ', (?, ?)';
+      } else {
+        searchRecordQsCore += ' (?, ?)';
+      }
+      searchRecordQsCoreParams.push(targetCategoryAppGroupList[i].categoryId);
+      searchRecordQsCoreParams.push(targetCategoryAppGroupList[i].applicationGroup);
+    }
+    searchRecordQsCore += ' )';
+    ///////////////////////////////////////////////////////////////
 
-  const searchRecordQs = `select * ${searchRecordQsCore} order by updated_at desc, record_id  limit ? offset ?`;
-  const recordCountQs = `select count(*) ${searchRecordQsCore}`;
-  const param = [...core_param, limit, offset];
+    const searchRecordQs = `select * ${searchRecordQsCore}
+      order by updated_at desc, record_id
+      limit ? offset ?`;
+    const searchRecordQsParams = [...searchRecordQsCoreParams, limit, offset];
+    const recordCountQs = `select count(*) ${searchRecordQsCore}`;
+    const recordCountQsParams = searchRecordQsCoreParams;
+    return {
+      searchRecordQs, searchRecordQsParams,
+      recordCountQs, recordCountQsParams,
+    };
+  })();
   console.log("searchRecordQs", searchRecordQs);
-  console.log("param", param);
+  console.log("searchRecordQsParams", searchRecordQsParams);
 
   ///////////////////////////////////////////////////////////////
 
   const [recordResult] = await pool.query(
-    searchRecordQs, param
+    searchRecordQs, searchRecordQsParams
   );
   mylog(recordResult);
 
@@ -361,7 +374,7 @@ const tomeActive = async (req, res) => {
     items[i] = resObj;
   }
 
-  const [recordCountResult] = await pool.query(recordCountQs, core_param);
+  const [recordCountResult] = await pool.query(recordCountQs, recordCountQsParams);
   if (recordCountResult.length === 1) {
     count = recordCountResult[0]['count(*)'];
   }
@@ -741,20 +754,60 @@ const acquireRecords = async (req, res, record_status, limitation) => {
     limit = 10;
   }
 
-  ///////////////////////////////////////////////////////////////
 
-  const searchRecordQsCoreParams = [record_status];
-  let searchRecordQsCore = `from record
-    where status = ?`;
-  if (limitation === "mine") {
-    searchRecordQsCore += ` and created_by = ?`;
-    searchRecordQsCoreParams.push(user.user_id);
-  }
-  const searchRecordQsParams = [...searchRecordQsCoreParams, limit, offset];
-  const searchRecordQs = `select * ${searchRecordQsCore}` +
-    ` order by updated_at desc, record_id asc
-    limit ? offset ?`;
-///////////////////////////////////////////////////////////////
+  const {
+    searchRecordQs, searchRecordQsParams,
+    recordCountQs, recordCountQsParams,
+  } = await (async () => {
+    const searchRecordQsCoreParams = [record_status];
+    let searchRecordQsCore = `from record
+      where status = ?`;
+
+    ///////////////////////////////////////////////////////////////
+    if (limitation === "mine") {
+      searchRecordQsCore += ` and created_by = ?`;
+      searchRecordQsCoreParams.push(user.user_id);
+    } else if (limitation === "tome") {
+      const myGroupIds = await (async () => {
+        const searchMyGroupQs = `select group_id from group_member where user_id = ?`;
+        const [myGroupResult] = await pool.query(searchMyGroupQs, [user.user_id]);
+        return myGroupResult.map(r => r.group_id);
+      })();
+      const targetCategoryAppGroupList = [];
+      const searchTargetQs = `select * from category_group where group_id in (?)`;
+      const [targetResult] = await pool.query(searchTargetQs, [myGroupIds]);
+      for (let j = 0; j < targetResult.length; j++) {
+        const targetLine = targetResult[j];
+        targetCategoryAppGroupList.push({
+          categoryId: targetLine.category_id,
+          applicationGroup: targetLine.application_group,
+        });
+      }
+      searchRecordQsCore += ` and (category_id, application_group) in (`;
+      for (let i = 0; i < targetCategoryAppGroupList.length; i++) {
+        if (i !== 0) {
+          searchRecordQsCore += ', (?, ?)';
+        } else {
+          searchRecordQsCore += ' (?, ?)';
+        }
+        searchRecordQsCoreParams.push(targetCategoryAppGroupList[i].categoryId);
+        searchRecordQsCoreParams.push(targetCategoryAppGroupList[i].applicationGroup);
+      }
+      searchRecordQsCore += ' )';
+    }
+    ///////////////////////////////////////////////////////////////
+
+    const searchRecordQs = `select * ${searchRecordQsCore}
+      order by updated_at desc, record_id asc
+      limit ? offset ?`;
+    const searchRecordQsParams = [...searchRecordQsCoreParams, limit, offset];
+    const recordCountQs = `select count(*) ${searchRecordQsCore}`;
+    const recordCountQsParams = searchRecordQsCoreParams;
+    return {
+      searchRecordQs, searchRecordQsParams,
+      recordCountQs, recordCountQsParams,
+    };
+  })();
 
   console.log("????", searchRecordQs, searchRecordQsParams);
   const [recordResult] = await pool.query(
@@ -843,9 +896,6 @@ const acquireRecords = async (req, res, record_status, limitation) => {
 
     items[i] = resObj;
   }
-
-  const recordCountQsParams = searchRecordQsCoreParams;
-  let recordCountQs = `select count(*) ${searchRecordQsCore}`;
 
   const [recordCountResult] = await pool.query(recordCountQs, recordCountQsParams);
   if (recordCountResult.length === 1) {
