@@ -240,10 +240,9 @@ const acquireRecords = async (req, res, record_status, limitation) => {
   }
 
   const {
-    searchRecordQs, searchRecordQsParams,
-    recordCountQs, recordCountQsParams,
+    searchRecordQsCore, searchRecordQsCoreParams,
   } = await (async () => {
-    let searchRecordQsCore = `from record where status = ?`;
+    let searchRecordQsCore = `record where status = ?`;
     const searchRecordQsCoreParams = [record_status];
 
     ///////////////////////////////////////////////////////////////
@@ -295,17 +294,18 @@ const acquireRecords = async (req, res, record_status, limitation) => {
     }
     ///////////////////////////////////////////////////////////////
 
-    const searchRecordQs = `select * ${searchRecordQsCore}
-      order by updated_at desc, record_id asc
-      limit ? offset ?`;
-    const searchRecordQsParams = [...searchRecordQsCoreParams, limit, offset];
-    const recordCountQs = `select count(*) ${searchRecordQsCore}`;
-    const recordCountQsParams = searchRecordQsCoreParams;
     return {
-      searchRecordQs, searchRecordQsParams,
-      recordCountQs, recordCountQsParams,
+      searchRecordQsCore, searchRecordQsCoreParams,
     };
   })();
+  const searchRecordQs = `
+    select *
+      from ${searchRecordQsCore}
+      order by updated_at desc, record_id asc
+      limit ? offset ?`;
+  const searchRecordQsParams = [...searchRecordQsCoreParams, limit, offset];
+  const recordCountQs = `select count(*) from ${searchRecordQsCore}`;
+  const recordCountQsParams = searchRecordQsCoreParams;
 
   sprint("start searchRecordQs");
   const [recordResult] = await pool.query(
@@ -315,13 +315,32 @@ const acquireRecords = async (req, res, record_status, limitation) => {
 
   const items = Array(recordResult.length);
   let count = 0;
-
   const searchUserQs = 'select * from user where user_id = ?';
   const searchGroupQs = 'select * from group_info where group_id = ?';
   const searchThumbQs =
     'select * from record_item_file where linked_record_id = ? order by item_id asc limit 1';
-  const countQs = 'select count(*) from record_comment where linked_record_id = ?';
+  const countQs = 'select count(*) AS cnt from record_comment where linked_record_id = ?';
   const searchLastQs = 'select * from record_last_access where user_id = ? and record_id = ?';
+
+  // - record
+  //  - record_id
+  //  - created_by
+  //  - created_at
+  //  - updated_at
+  //  - application_group
+  //  - title
+  // - user
+  //  - name
+  // - group_info
+  //  - name
+  // - record_item_file
+  //  - item_id
+  // - record_comment
+  //  - cnt
+  //    - 既定値が0であることに注意
+  // - record_last_access
+  //  - access_time
+  //  - 特殊:isUnConfirmed
 
   for (let i = 0; i < recordResult.length; i++) {
     const resObj = {
@@ -339,7 +358,7 @@ const acquireRecords = async (req, res, record_status, limitation) => {
     };
 
     const line = recordResult[i];
-    const recordId = recordResult[i].record_id;
+    const recordId = line.record_id;
     const createdBy = line.created_by;
     const applicationGroup = line.application_group;
     const updatedAt = line.updated_at;
@@ -366,7 +385,7 @@ const acquireRecords = async (req, res, record_status, limitation) => {
 
     const [countResult] = await pool.query(countQs, [recordId]);
     if (countResult.length === 1) {
-      commentCount = countResult[0]['count(*)'];
+      commentCount = countResult[0]['cnt'];
     }
 
     const [lastResult] = await pool.query(searchLastQs, [user.user_id, recordId]);
