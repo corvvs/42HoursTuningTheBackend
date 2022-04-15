@@ -621,7 +621,10 @@ const mineActive = async (req, res) => {
     limit = 10;
   }
 
-  const searchRecordQs = `select * from record where created_by = ? and status = "open" order by updated_at desc, record_id asc limit ? offset ?`;
+  const searchRecordQs = `select * from record
+    where created_by = ? and status = "open"
+    order by updated_at desc, record_id asc
+    limit ? offset ?`;
 
   const [recordResult] = await pool.query(searchRecordQs, [user.user_id, limit, offset]);
   mylog(recordResult);
@@ -708,7 +711,8 @@ const mineActive = async (req, res) => {
     items[i] = resObj;
   }
 
-  const recordCountQs = 'select count(*) from record where created_by = ? and status = "open"';
+  const recordCountQs = `select count(*) from record
+    where created_by = ? and status = "open"`;
 
   const [recordCountResult] = await pool.query(recordCountQs, [user.user_id]);
   if (recordCountResult.length === 1) {
@@ -741,9 +745,21 @@ const acquireRecords = async (req, res, record_status, limitation) => {
     limit = 10;
   }
 
-  const searchRecordQs = `select * from record where status = ? order by updated_at desc, record_id asc limit ? offset ?`;
+  const searchRecordQsParams = [record_status];
+  let searchRecordQs = `select * from record
+    where status = ?`;
+  if (limitation === "mine") {
+    searchRecordQs += ` and created_by = ?`;
+    searchRecordQsParams.push(user.user_id);
+  }
+  searchRecordQs +=
+    ` order by updated_at desc, record_id asc
+    limit ? offset ?`;
+  searchRecordQsParams.push(limit, offset);
 
-  const [recordResult] = await pool.query(searchRecordQs, [record_status, limit, offset]);
+  const [recordResult] = await pool.query(
+    searchRecordQs, searchRecordQsParams
+  );
   mylog(recordResult);
 
   const items = Array(recordResult.length);
@@ -828,9 +844,15 @@ const acquireRecords = async (req, res, record_status, limitation) => {
     items[i] = resObj;
   }
 
-  const recordCountQs = 'select count(*) from record where status = ?';
+  const recordCountQsParams = [record_status];
+  let recordCountQs = `select count(*) from record`;
+  if (limitation === "mine") {
+    recordCountQs += ` and created_by = ?`;
+    recordCountQsParams.push(user.user_id);
+  }
+  recordCountQs += ` where status = ?`;
 
-  const [recordCountResult] = await pool.query(recordCountQs, [record_status]);
+  const [recordCountResult] = await pool.query(recordCountQs, recordCountQsParams);
   if (recordCountResult.length === 1) {
     count = recordCountResult[0]['count(*)'];
   }

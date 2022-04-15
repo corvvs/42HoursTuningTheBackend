@@ -57,7 +57,7 @@ app.get('/api/client/record-views/allClosed', async (req, res, next) => {
 
 app.get('/api/client/record-views/mineActive', async (req, res, next) => {
   try {
-    await api.mineActive(req, res);
+    await api.acquireRecords(req, res, "open", "mine");
   } catch(e) {
     console.log(e);
     next(new Error("Unexpect"));
