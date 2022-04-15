@@ -35,7 +35,7 @@ const mylog = (obj) => {
 const getLinkedUser = async (headers) => {
   const target = headers['x-app-key'];
   mylog(target);
-  const qs = `select * from session where value = ?`;
+  const qs = `select linked_user_id from session where value = ? limit 2`;
 
   const [rows] = await pool.query(qs, [`${target}`]);
 
@@ -225,8 +225,9 @@ const getRecord = async (req, res) => {
  * - limitation:    "tome" | "all" | "mine"
  */
 const acquireRecords = async (req, res, record_status, limitation) => {
-
+  sprint("start getLinkedUser");
   let user = await getLinkedUser(req.headers);
+  sprint("end   getLinkedUser");
 
   if (!user) {
     res.status(401).send();
@@ -245,9 +246,8 @@ const acquireRecords = async (req, res, record_status, limitation) => {
     searchRecordQs, searchRecordQsParams,
     recordCountQs, recordCountQsParams,
   } = await (async () => {
+    let searchRecordQsCore = `from record where status = ?`;
     const searchRecordQsCoreParams = [record_status];
-    let searchRecordQsCore = `from record
-      where status = ?`;
 
     ///////////////////////////////////////////////////////////////
     if (limitation === "mine") {
@@ -295,10 +295,11 @@ const acquireRecords = async (req, res, record_status, limitation) => {
     };
   })();
 
+  sprint("start searchRecordQs");
   const [recordResult] = await pool.query(
     searchRecordQs, searchRecordQsParams
   );
-  mylog(recordResult);
+  sprint("end   searchRecordQs");
 
   const items = Array(recordResult.length);
   let count = 0;
@@ -422,16 +423,55 @@ const getComments = async (req, res) => {
 
   const recordId = req.params.recordId;
 
-  const commentQs = `select * from record_comment where linked_record_id = ? order by created_at desc`;
+  const commentQs = `
+    SELECT
+      record_comment.created_by AS created_by,
+      record_comment.comment_id AS comment_id,
+      record_comment.created_at AS created_at,
+      record_comment.value      AS value,
+      group_info.name           AS group_name,
+      user.name                 AS user_name
+    FROM
+      ((
+        record_comment
+          LEFT JOIN
+        user
+          ON
+        record_comment.created_by = user.user_id
+      )
+          LEFT JOIN
+        group_member
+          ON
+        user.user_id = group_member.user_id
+          AND
+        group_member.is_primary = true
+      )
+        LEFT JOIN
+      group_info
+        ON
+      group_member.group_id = group_info.group_id
+    WHERE
+      linked_record_id = ?
+    ORDER BY
+      created_at desc
+  `;
+  // 使うデータ
+  // - record_comment
+  //   - created_by
+  //   - created_at
+  //   - comment_id
+  //   - value
+  // - group_member
+  //   - 中間データのみ
+  // - group_info
+  //   - name
+  // - user
+  //   - name
 
   const [commentResult] = await pool.query(commentQs, [`${recordId}`]);
-  mylog(commentResult);
 
   const commentList = Array(commentResult.length);
 
-  const searchPrimaryGroupQs = `select * from group_member where user_id = ? and is_primary = true`;
-  const searchUserQs = `select * from user where user_id = ?`;
-  const searchGroupQs = `select * from group_info where group_id = ?`;
   for (let i = 0; i < commentResult.length; i++) {
     let commentInfo = {
       commentId: '',
@@ -442,32 +482,18 @@ const getComments = async (req, res) => {
       createdAt: null,
     };
     const line = commentResult[i];
-
-    const [primaryResult] = await pool.query(searchPrimaryGroupQs, [line.created_by]);
-    if (primaryResult.length === 1) {
-      const primaryGroupId = primaryResult[0].group_id;
-
-      const [groupResult] = await pool.query(searchGroupQs, [primaryGroupId]);
-      if (groupResult.length === 1) {
-        commentInfo.createdByPrimaryGroupName = groupResult[0].name;
-      }
+    // console.log(`line[${i}]`, line);
+    commentInfo.commentId = line["comment_id"];
+    commentInfo.value     = line["value"];
+    commentInfo.createdBy = line["created_by"];
+    commentInfo.createdAt = line["created_at"];
+    if (typeof line["group_name"] === "string") {
+      commentInfo.createdByPrimaryGroupName = line["group_name"];
     }
-
-    const [userResult] = await pool.query(searchUserQs, [line.created_by]);
-    if (userResult.length === 1) {
-      commentInfo.createdByName = userResult[0].name;
+    if (typeof line["user_name"] === "string") {
+      commentInfo.createdByName = line["user_name"];
     }
-
-    commentInfo.commentId = line.comment_id;
-    commentInfo.value = line.value;
-    commentInfo.createdBy = line.created_by;
-    commentInfo.createdAt = line.created_at;
-
     commentList[i] = commentInfo;
-  }
-
-  for (const row of commentList) {
-    mylog(row);
   }
 
   res.send({ items: commentList });
@@ -528,11 +554,6 @@ const getCategories = async (req, res) => {
     "オフィス備品",
     "その他",
   ].map((name, i) => ({ name, category_id: i + 1 }));
-
-  // sprint("start:  get categories");
-  // const [rows] = await pool.query(`select * from category`);
-  // sprint("end:    get categories");
-
   const items = {};
   for (let i = 0; i < rows.length; i++) {
     const { category_id, name } = rows[i];
@@ -552,7 +573,7 @@ const postFiles = async (req, res) => {
   }
 
   const base64Data = req.body.data;
-  mylog(base64Data);
+  // mylog(base64Data);
 
   const name = req.body.name;
 
@@ -623,7 +644,7 @@ const getRecordItemFile = async (req, res) => {
 
   const data = fs.readFileSync(fileInfo.path);
   const base64 = data.toString('base64');
-  mylog(base64);
+  // mylog(base64);
 
   res.send({ data: base64, name: fileInfo.name });
 };
@@ -665,7 +686,7 @@ const getRecordItemFileThumbnail = async (req, res) => {
 
   const data = fs.readFileSync(fileInfo.path);
   const base64 = data.toString('base64');
-  mylog(base64);
+  // mylog(base64);
 
   res.send({ data: base64, name: fileInfo.name });
 };
