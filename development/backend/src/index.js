@@ -49,7 +49,7 @@ app.get('/api/client/record-views/allActive', async (req, res, next) => {
 
 app.get('/api/client/record-views/allClosed', async (req, res, next) => {
   try {
-    await api.acquireRecords(req, res, "close", "all");
+    await api.acquireRecords(req, res, "closed", "all");
   } catch(e) {
     console.log(e);
     next(new Error("Unexpect"));

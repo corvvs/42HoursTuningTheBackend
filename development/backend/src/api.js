@@ -754,7 +754,6 @@ const acquireRecords = async (req, res, record_status, limitation) => {
     limit = 10;
   }
 
-
   const {
     searchRecordQs, searchRecordQsParams,
     recordCountQs, recordCountQsParams,
