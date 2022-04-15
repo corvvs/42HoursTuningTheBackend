@@ -1,7 +1,9 @@
-const express = require('express')
+const compression = require('compression');
+const express = require('express');
 const app = express();
 
-app.use(express.json({limit: '10mb'}))
+app.use(compression());
+app.use(express.json({limit: '10mb'}));
 
 const api = require("./api");
 

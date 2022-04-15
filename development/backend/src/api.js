@@ -635,8 +635,9 @@ const postFiles = async (req, res) => {
   const newId = uuidv4();
   const newThumbId = uuidv4();
   const binary = Buffer.from(base64Data, 'base64');
+  const image_path = `${filePath}${newId}_${name}`;
   const [dummy, image] = await Promise.all([
-    writeFilePromise(`${filePath}${newId}_${name}`, binary),
+    writeFilePromise(image_path, binary),
     jimp.read(binary),
   ]);
   // mylog(image.bitmap.width);
@@ -645,7 +646,8 @@ const postFiles = async (req, res) => {
   const size = image.bitmap.width < image.bitmap.height ? image.bitmap.width : image.bitmap.height;
   await image.cover(size, size);
 
-  await image.writeAsync(`${filePath}${newThumbId}_thumb_${name}`);
+  const thumb_path = `${filePath}${newThumbId}_thumb_${name}`;
+  await image.writeAsync(thumb_path);
 
   await pool.query(`
     insert into file (file_id, path, name)
@@ -654,8 +656,8 @@ const postFiles = async (req, res) => {
         (?, ?, ?)
     `,
     [
-      `${newId}`, `${filePath}${newId}_${name}`, `${name}`,
-      `${newThumbId}`, `${filePath}${newThumbId}_thumb_${name}`, `thumb_${name}`,
+      newId, image_path, name,
+      newThumbId, thumb_path, `thumb_${name}`,
     ],
   );
 
