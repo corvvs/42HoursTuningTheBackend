@@ -5,6 +5,11 @@ const jimp = require('jimp');
 
 const mysql = require('mysql2/promise');
 
+const sprint = (caption) => {
+  console.log(`${Date.now()}: ${caption}`);
+}
+
+
 
 // MEMO: 設定項目はここを参考にした
 // https://github.com/sidorares/node-mysql2#api-and-configuration
@@ -20,12 +25,15 @@ const mysqlOption = {
 const pool = mysql.createPool(mysqlOption);
 
 const mylog = (obj) => {
+  // 配列だったら、各要素を1行ずつ出力する
+  sprint("mylog");
   if (Array.isArray(obj)) {
     for (const e of obj) {
       console.log(e);
     }
     return;
   }
+  // 配列でなければ、そのまま出力
   console.log(obj);
 };
 
@@ -218,8 +226,8 @@ const getRecord = async (req, res) => {
 // GET /record-views/tomeActive
 // 自分宛一覧
 const tomeActive = async (req, res) => {
+  // 呼び出したユーザデータ取得
   let user = await getLinkedUser(req.headers);
-
   if (!user) {
     res.status(401).send();
     return;
@@ -227,16 +235,19 @@ const tomeActive = async (req, res) => {
 
   let offset = Number(req.query.offset);
   let limit = Number(req.query.limit);
-
   if (Number.isNaN(offset) || Number.isNaN(limit)) {
     offset = 0;
     limit = 10;
   }
 
+  // [[ユーザが所属しているグループを取得]]
+  // (多数あるかもしれない)
   const searchMyGroupQs = `select * from group_member where user_id = ?`;
   const [myGroupResult] = await pool.query(searchMyGroupQs, [user.user_id]);
   mylog(myGroupResult);
 
+
+  // [[targetCategoryAppGroupList を取得する処理]]
   const targetCategoryAppGroupList = [];
   const searchTargetQs = `select * from category_group where group_id = ?`;
 
@@ -256,8 +267,13 @@ const tomeActive = async (req, res) => {
     }
   }
 
+
+
+  // [[targetCategoryAppGroupListの要素を含むrecordを取得]]
+  // データ
   let searchRecordQs =
     'select * from record where status = "open" and (category_id, application_group) in (';
+  // 個数
   let recordCountQs =
     'select count(*) from record where status = "open" and (category_id, application_group) in (';
   const param = [];
@@ -835,14 +851,18 @@ const postComments = async (req, res) => {
 // GET categories/
 // カテゴリーの取得
 const getCategories = async (req, res) => {
+  sprint("start: getCategories");
   let user = await getLinkedUser(req.headers);
-
+  sprint("getLinkedUser finished");
   if (!user) {
     res.status(401).send();
     return;
   }
 
-  const [rows] = await pool.query(`select * from category`);
+  const query = `select * from category`
+  sprint(`query start: "${query}"`);
+  const [rows] = await pool.query(query);
+  sprint(`query end`);
 
   for (const row of rows) {
     mylog(row);
@@ -850,9 +870,11 @@ const getCategories = async (req, res) => {
 
   const items = {};
 
+  sprint(`items collect start`);
   for (let i = 0; i < rows.length; i++) {
     items[`${rows[i]['category_id']}`] = { name: rows[i].name };
   }
+  sprint(`items collect end`);
 
   res.send({ items });
 };
