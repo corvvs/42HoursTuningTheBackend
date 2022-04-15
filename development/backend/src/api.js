@@ -529,6 +529,26 @@ const postComments = async (req, res) => {
   res.send({});
 };
 
+
+const categoryMaster = {};
+const categoryList = [
+  "緊急の対応が必要",
+  "故障・不具合(大型)",
+  "故障・不具合(中型・小型)",
+  "異常の疑い(大型)",
+  "異常の疑い(中型・小型)",
+  "お客様からの問い合わせ",
+  "オフィス外装・インフラ",
+  "貸与品関連",
+  "オフィス備品",
+  "その他",
+].map((name, i) => ({ name, category_id: i + 1 }));
+for (let i = 0; i < categoryList.length; i++) {
+  const { category_id, name } = categoryList[i];
+  categoryMaster[category_id] = { name };
+}
+
+
 // GET categories/
 // カテゴリーの取得
 const getCategories = async (req, res) => {
@@ -542,24 +562,7 @@ const getCategories = async (req, res) => {
   }
 
   // マスターデータを返すだけっぽいので埋め込んでしまえばいいのでは？
-  const rows = [
-    "緊急の対応が必要",
-    "故障・不具合(大型)",
-    "故障・不具合(中型・小型)",
-    "異常の疑い(大型)",
-    "異常の疑い(中型・小型)",
-    "お客様からの問い合わせ",
-    "オフィス外装・インフラ",
-    "貸与品関連",
-    "オフィス備品",
-    "その他",
-  ].map((name, i) => ({ name, category_id: i + 1 }));
-  const items = {};
-  for (let i = 0; i < rows.length; i++) {
-    const { category_id, name } = rows[i];
-    items[category_id] = { name };
-  }
-  res.send({ items });
+  res.send({ items: categoryMaster });
 };
 
 // POST files/
