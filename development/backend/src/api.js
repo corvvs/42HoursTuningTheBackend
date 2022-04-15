@@ -745,18 +745,22 @@ const acquireRecords = async (req, res, record_status, limitation) => {
     limit = 10;
   }
 
-  const searchRecordQsParams = [record_status];
-  let searchRecordQs = `select * from record
+  ///////////////////////////////////////////////////////////////
+
+  const searchRecordQsCoreParams = [record_status];
+  let searchRecordQsCore = `from record
     where status = ?`;
   if (limitation === "mine") {
-    searchRecordQs += ` and created_by = ?`;
-    searchRecordQsParams.push(user.user_id);
+    searchRecordQsCore += ` and created_by = ?`;
+    searchRecordQsCoreParams.push(user.user_id);
   }
-  searchRecordQs +=
+  const searchRecordQsParams = [...searchRecordQsCoreParams, limit, offset];
+  const searchRecordQs = `select * ${searchRecordQsCore}` +
     ` order by updated_at desc, record_id asc
     limit ? offset ?`;
-  searchRecordQsParams.push(limit, offset);
+///////////////////////////////////////////////////////////////
 
+  console.log("????", searchRecordQs, searchRecordQsParams);
   const [recordResult] = await pool.query(
     searchRecordQs, searchRecordQsParams
   );
@@ -844,13 +848,8 @@ const acquireRecords = async (req, res, record_status, limitation) => {
     items[i] = resObj;
   }
 
-  const recordCountQsParams = [record_status];
-  let recordCountQs = `select count(*) from record`;
-  if (limitation === "mine") {
-    recordCountQs += ` and created_by = ?`;
-    recordCountQsParams.push(user.user_id);
-  }
-  recordCountQs += ` where status = ?`;
+  const recordCountQsParams = searchRecordQsCoreParams;
+  let recordCountQs = `select count(*) ${searchRecordQsCore}`;
 
   const [recordCountResult] = await pool.query(recordCountQs, recordCountQsParams);
   if (recordCountResult.length === 1) {
