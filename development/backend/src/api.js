@@ -62,7 +62,6 @@ const postRecords = async (req, res) => {
   mylog(user);
 
   const body = req.body;
-  mylog(body);
 
   let [rows] = await pool.query(
     `select * from group_member where user_id = ?
@@ -78,7 +77,6 @@ const postRecords = async (req, res) => {
 
   const userPrimary = rows[0];
 
-  mylog(userPrimary);
 
   const newId = uuidv4();
 
@@ -123,7 +121,6 @@ const getRecord = async (req, res) => {
   const recordQs = `select * from record where record_id = ?`;
 
   const [recordResult] = await pool.query(recordQs, [`${recordId}`]);
-  mylog(recordResult);
 
   if (recordResult.length !== 1) {
     res.status(404).send({});
@@ -250,18 +247,32 @@ const acquireRecords = async (req, res, record_status, limitation) => {
     const searchRecordQsCoreParams = [record_status];
 
     ///////////////////////////////////////////////////////////////
+    // record と user の関係性を考慮するセクション
     if (limitation === "mine") {
       searchRecordQsCore += ` and created_by = ?`;
       searchRecordQsCoreParams.push(user.user_id);
     } else if (limitation === "tome") {
-      const myGroupIds = await (async () => {
-        const searchMyGroupQs = `select group_id from group_member where user_id = ?`;
-        const [myGroupResult] = await pool.query(searchMyGroupQs, [user.user_id]);
-        return myGroupResult.map(r => r.group_id);
-      })();
+      // - ユーザが所属するグループの一覧を取得し
+      // - そのグループIDが上記一覧のいずれかを含む category_group を取得する
       const targetCategoryAppGroupList = [];
-      const searchTargetQs = `select * from category_group where group_id in (?)`;
-      const [targetResult] = await pool.query(searchTargetQs, [myGroupIds]);
+      const searchTargetQs = `
+        SELECT
+          *
+        FROM
+          category_group
+        WHERE
+          group_id
+            IN
+          (
+            SELECT
+              group_id
+            FROM
+              group_member
+            WHERE
+              user_id = ?
+          )
+      `;
+      const [targetResult] = await pool.query(searchTargetQs, [user.user_id]);
       for (let j = 0; j < targetResult.length; j++) {
         const targetLine = targetResult[j];
         targetCategoryAppGroupList.push({
@@ -269,6 +280,7 @@ const acquireRecords = async (req, res, record_status, limitation) => {
           applicationGroup: targetLine.application_group,
         });
       }
+      // TODO: これもJOINにできそう
       searchRecordQsCore += ` and (category_id, application_group) in (`;
       for (let i = 0; i < targetCategoryAppGroupList.length; i++) {
         if (i !== 0) {
@@ -422,7 +434,6 @@ const getComments = async (req, res) => {
   }
 
   const recordId = req.params.recordId;
-
   const commentQs = `
     SELECT
       record_comment.created_by AS created_by,
@@ -468,7 +479,9 @@ const getComments = async (req, res) => {
   // - user
   //   - name
 
-  const [commentResult] = await pool.query(commentQs, [`${recordId}`]);
+  // `${recordId}` <- 謎の表現
+  // const [commentResult] = await pool.query(commentQs, [`${recordId}`]);
+  const [commentResult] = await pool.query(commentQs, [recordId]);
 
   const commentList = Array(commentResult.length);
 
@@ -482,7 +495,6 @@ const getComments = async (req, res) => {
       createdAt: null,
     };
     const line = commentResult[i];
-    // console.log(`line[${i}]`, line);
     commentInfo.commentId = line["comment_id"];
     commentInfo.value     = line["value"];
     commentInfo.createdBy = line["created_by"];
@@ -547,7 +559,6 @@ for (let i = 0; i < categoryList.length; i++) {
   const { category_id, name } = categoryList[i];
   categoryMaster[category_id] = { name };
 }
-
 
 // GET categories/
 // カテゴリーの取得
@@ -641,7 +652,6 @@ const getRecordItemFile = async (req, res) => {
     res.status(404).send({});
     return;
   }
-  mylog(rows[0]);
 
   const fileInfo = rows[0];
 
@@ -683,7 +693,6 @@ const getRecordItemFileThumbnail = async (req, res) => {
     res.status(404).send({});
     return;
   }
-  mylog(rows[0]);
 
   const fileInfo = rows[0];
 
