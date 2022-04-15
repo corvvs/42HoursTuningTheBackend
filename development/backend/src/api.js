@@ -5,6 +5,9 @@ const jimp = require('jimp');
 
 const mysql = require('mysql2/promise');
 
+const sprint = (name) => {
+  console.log(`${Date.now()}: ${name}`);
+};
 
 // MEMO: 設定項目はここを参考にした
 // https://github.com/sidorares/node-mysql2#api-and-configuration
@@ -292,7 +295,6 @@ const acquireRecords = async (req, res, record_status, limitation) => {
     };
   })();
 
-  console.log("????", searchRecordQs, searchRecordQsParams);
   const [recordResult] = await pool.query(
     searchRecordQs, searchRecordQsParams
   );
@@ -324,7 +326,6 @@ const acquireRecords = async (req, res, record_status, limitation) => {
     };
 
     const line = recordResult[i];
-    mylog(line);
     const recordId = recordResult[i].record_id;
     const createdBy = line.created_by;
     const applicationGroup = line.application_group;
@@ -357,7 +358,6 @@ const acquireRecords = async (req, res, record_status, limitation) => {
 
     const [lastResult] = await pool.query(searchLastQs, [user.user_id, recordId]);
     if (lastResult.length === 1) {
-      mylog(updatedAt);
       const updatedAtNum = Date.parse(updatedAt);
       const accessTimeNum = Date.parse(lastResult[0].access_time);
       if (updatedAtNum <= accessTimeNum) {
@@ -506,25 +506,38 @@ const postComments = async (req, res) => {
 // GET categories/
 // カテゴリーの取得
 const getCategories = async (req, res) => {
+  sprint("start:  getLinkedUser");
   let user = await getLinkedUser(req.headers);
+  sprint("end:    getLinkedUser");
 
   if (!user) {
     res.status(401).send();
     return;
   }
 
-  const [rows] = await pool.query(`select * from category`);
+  // マスターデータを返すだけっぽいので埋め込んでしまえばいいのでは？
+  const rows = [
+    "緊急の対応が必要",
+    "故障・不具合(大型)",
+    "故障・不具合(中型・小型)",
+    "異常の疑い(大型)",
+    "異常の疑い(中型・小型)",
+    "お客様からの問い合わせ",
+    "オフィス外装・インフラ",
+    "貸与品関連",
+    "オフィス備品",
+    "その他",
+  ].map((name, i) => ({ name, category_id: i + 1 }));
 
-  for (const row of rows) {
-    mylog(row);
-  }
+  // sprint("start:  get categories");
+  // const [rows] = await pool.query(`select * from category`);
+  // sprint("end:    get categories");
 
   const items = {};
-
   for (let i = 0; i < rows.length; i++) {
-    items[`${rows[i]['category_id']}`] = { name: rows[i].name };
+    const { category_id, name } = rows[i];
+    items[category_id] = { name };
   }
-
   res.send({ items });
 };
 
@@ -660,10 +673,6 @@ const getRecordItemFileThumbnail = async (req, res) => {
 module.exports = {
   postRecords,
   getRecord,
-  tomeActive,
-  allActive,
-  allClosed,
-  mineActive,
   acquireRecords,
   updateRecord,
   getComments,
