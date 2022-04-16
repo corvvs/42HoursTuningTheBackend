@@ -244,8 +244,8 @@ const getRecord = async (req, res) => {
  */
 const acquireRecords = async (req, res, record_status, limitation) => {
   // sprint(`start acquireRecords(${record_status}, ${limitation})`);
-
-
+  const ts = [Date.now()];
+  const cs = [""];
   // sprint("start getLinkedUser");
   let user = await getLinkedUser(req.headers);
   // sprint("end   getLinkedUser");
@@ -264,6 +264,8 @@ const acquireRecords = async (req, res, record_status, limitation) => {
   }
 
   // sprint("start precondition");
+  ts.push(Date.now());
+  cs.push("認証");
   const {
     searchRecordQsCore, searchRecordQsCoreParams,
   } = await (async () => {
@@ -304,6 +306,8 @@ const acquireRecords = async (req, res, record_status, limitation) => {
     };
   })();
   // sprint("end   precondition");
+  ts.push(Date.now());
+  cs.push("precond");
   const searchRecordQs = `
     select *
       from ${searchRecordQsCore}
@@ -320,6 +324,8 @@ const acquireRecords = async (req, res, record_status, limitation) => {
   );
   // sprint("end   searchRecordQs");
 
+  ts.push(Date.now());
+  cs.push("body");
   const items = Array(recordResult.length);
   let count = 0;
   const searchUserQs = 'select * from user where user_id = ?';
@@ -420,12 +426,19 @@ const acquireRecords = async (req, res, record_status, limitation) => {
     items[i] = resObj;
   }
   // sprint(`end   item_query(${recordResult.length})`);
+  ts.push(Date.now());
+  cs.push("aggre");
 
   const [recordCountResult] = await countQueryPromise;
   if (recordCountResult.length === 1) {
     count = recordCountResult[0]['count(*)'];
   }
+  ts.push(Date.now());
+  cs.push("count");
 
+  for (let i = 1; i < ts.length; ++i) {
+    console.log(`[${i}] ${ts[i] - ts[i - 1]}ms\t${cs[i]}`);
+  }
   // sprint(`end   acquireRecords(${record_status}, ${limitation})`);
   res.send({ count: count, items: items });
 };
