@@ -139,12 +139,6 @@ const getRecord = async (req, res) => {
 
   const recordId = req.params.recordId;
 
-  const recordQs = `select * from record where record_id = ?`;
-  const searchPrimaryGroupQs = `select * from group_member where user_id = ? and is_primary = true`;
-  const searchUserQs = `select * from user where user_id = ?`;
-  const searchGroupQs = `select * from group_info where group_id = ?`;
-  const searchCategoryQs = `select * from category where category_id = ?`;
-
   const combinedQs = `
       SELECT
       record.record_id          AS record_id,
@@ -212,7 +206,6 @@ const getRecord = async (req, res) => {
   `
   const combinedParams = [recordId];
 
-  // const [recordResult] = await pool.query(recordQs, [`${recordId}`]);
   const [combinedResult] = await pool.query(combinedQs, combinedParams);
 
   if (combinedResult.length !== 1) {
@@ -237,43 +230,6 @@ const getRecord = async (req, res) => {
     createdAt: result.created_at,
     files: [],
   };
-  // console.log("recordInfo", recordInfo);
-
-  // const line = combinedResult[0];
-
-  // const [primaryResult] = await pool.query(searchPrimaryGroupQs, [line.created_by]);
-  // if (primaryResult.length === 1) {
-  //   const primaryGroupId = primaryResult[0].group_id;
-
-  //   const [groupResult] = await pool.query(searchGroupQs, [primaryGroupId]);
-  //   if (groupResult.length === 1) {
-  //     recordInfo.createdByPrimaryGroupName = groupResult[0].name;
-  //   }
-  // }
-
-  // const [appGroupResult] = await pool.query(searchGroupQs, [line.application_group]);
-  // if (appGroupResult.length === 1) {
-  //   recordInfo.applicationGroupName = appGroupResult[0].name;
-  // }
-
-  // const [userResult] = await pool.query(searchUserQs, [line.created_by]);
-  // if (userResult.length === 1) {
-  //   recordInfo.createdByName = userResult[0].name;
-  // }
-
-  // const [categoryResult] = await pool.query(searchCategoryQs, [line.category_id]);
-  // if (categoryResult.length === 1) {
-  //   recordInfo.categoryName = categoryResult[0].name;
-  // }
-
-  // recordInfo.recordId = line.record_id;
-  // recordInfo.status = line.status;
-  // recordInfo.title = line.title;
-  // recordInfo.detail = line.detail;
-  // recordInfo.categoryId = line.category_id;
-  // recordInfo.applicationGroup = line.application_group;
-  // recordInfo.createdBy = line.created_by;
-  // recordInfo.createdAt = line.created_at;
 
   const item_ids = result.item_ids.split("/");
   const file_names = result.file_names.split("/");
@@ -281,25 +237,6 @@ const getRecord = async (req, res) => {
     const name = file_names[i];
     recordInfo.files.push({ itemId: parseInt(itemId, 10), name });
   })
-
-  // const searchItemQs = `select * from record_item_file where linked_record_id = ? order by item_id asc`;
-  // const [itemResult] = await pool.query(searchItemQs, [result.record_id]);
-  // // mylog('itemResult');
-  // // mylog(itemResult);
-
-
-  // const searchFileQs = `select * from file where file_id = ?`;
-  // for (let i = 0; i < itemResult.length; i++) {
-  //   const item = itemResult[i];
-  //   const [fileResult] = await pool.query(searchFileQs, [item.linked_file_id]);
-
-  //   let fileName = '';
-  //   if (fileResult.length !== 0) {
-  //     fileName = fileResult[0].name;
-  //   }
-
-  //   recordInfo.files.push({ itemId: item.item_id, name: fileName });
-  // }
 
   await pool.query(
     `
@@ -398,22 +335,89 @@ const acquireRecords = async (req, res, record_status, limitation) => {
   const recordCountQsParams = searchRecordQsCoreParams;
   const countQueryPromise = pool.query(recordCountQs, recordCountQsParams)
 
-  // sprint("start searchRecordQs");
-  const [recordResult] = await pool.query(
-    searchRecordQs, searchRecordQsParams
+  console.log("searchRecordQsCore", searchRecordQsCore);
+  console.log("searchRecordQsParams", searchRecordQsParams);
+  const combinedQueryQs = `
+
+  SELECT
+  record.record_id            AS record_id,
+  record.created_by           AS created_by,
+  record.created_at           AS created_at,
+  record.updated_at           AS updated_at,
+  record.application_group    AS application_group,
+  record.title                AS title,
+  min(user.name)              AS user_name,
+  min(group_info.name)        AS group_name,
+  min(record_item_file.item_id)
+                              AS thumb_item_id,
+  min(record_last_access.access_time)
+                              AS access_time,
+  count(distinct record_comment.comment_id)
+                              AS comment_cnt
+FROM
+  (select * from ${searchRecordQsCore}) AS record
+
+  LEFT JOIN
+  user
+  ON
+  record.created_by = user.user_id
+
+  LEFT JOIN
+  group_info
+  ON
+  record.application_group = group_info.group_id
+
+  LEFT JOIN
+  record_last_access
+  ON
+  (record.record_id = record_last_access.record_id
+      AND
+  user.user_id = record_last_access.user_id)
+
+  LEFT JOIN
+  record_item_file
+  ON
+  record.record_id = record_item_file.linked_record_id
+
+  LEFT JOIN
+  record_comment
+  ON
+  record.record_id = record_comment.linked_record_id
+
+GROUP BY
+  record.record_id
+
+ORDER BY
+  record.updated_at DESC, record.record_id ASC
+LIMIT ? OFFSET ?
+;
+
+  `;
+
+  const [combinedResult] = await pool.query(
+    combinedQueryQs, searchRecordQsParams
   );
+
+  // sprint("start searchRecordQs");
+  // const [recordResult] = await pool.query(
+  //   searchRecordQs, searchRecordQsParams
+  // );
   // sprint("end   searchRecordQs");
 
   ts.push(Date.now());
   cs.push("body");
-  const items = Array(recordResult.length);
+  const items = Array(combinedResult.length);
   let count = 0;
-  const searchUserQs = 'select * from user where user_id = ?';
-  const searchGroupQs = 'select * from group_info where group_id = ?';
-  const searchThumbQs =
-    'select * from record_item_file where linked_record_id = ? order by item_id asc limit 1';
-  const countQs = 'select count(*) AS cnt from record_comment where linked_record_id = ?';
-  const searchLastQs = 'select * from record_last_access where user_id = ? and record_id = ?';
+  const searchUserQs
+    = 'select * from user where user_id = ?';
+  const searchGroupQs
+    = 'select * from group_info where group_id = ?';
+  const searchThumbQs
+    = 'select * from record_item_file where linked_record_id = ? order by item_id asc limit 1';
+  const countQs
+    = 'select count(*) AS cnt from record_comment where linked_record_id = ?';
+  const searchLastQs
+    = 'select * from record_last_access where user_id = ? and record_id = ?';
 
   // - record
   //  - record_id
@@ -442,76 +446,80 @@ const acquireRecords = async (req, res, record_status, limitation) => {
   // record.record_id = record_last_access.record_id
   // user.user_id = record_last_access.user_id
 
-  
-  
-
   // sprint(`start item_query(${recordResult.length})`);
-  for (let i = 0; i < recordResult.length; i++) {
-    const resObj = {
-      recordId: null,
-      title: '',
-      applicationGroup: null,
-      applicationGroupName: null,
-      createdBy: null,
-      createdByName: null,
-      createAt: '',
-      commentCount: 0,
-      isUnConfirmed: true,
-      thumbNailItemId: null,
-      updatedAt: '',
-    };
-
-    const line = recordResult[i];
+  for (let i = 0; i < combinedResult.length; i++) {
+    const line = combinedResult[i];
+    // console.log(`line[${i}]`, line);
     const recordId = line.record_id;
     const createdBy = line.created_by;
     const applicationGroup = line.application_group;
     const updatedAt = line.updated_at;
-    let createdByName = null;
-    let applicationGroupName = null;
-    let thumbNailItemId = null;
-    let commentCount = 0;
+
+    const resObj = {
+      recordId,
+      title: line.title,
+      applicationGroup,
+      applicationGroupName: null,
+      createdBy,
+      createdByName: null,
+      createAt: line.created_at,
+      commentCount: 0,
+      isUnConfirmed: true,
+      thumbNailItemId: null,
+      updatedAt,
+    };
+
+    let createdByName = line.user_name;
+    let applicationGroupName = line.group_name;
+    let thumbNailItemId = line.thumb_item_id;
+    let commentCount = line.comment_cnt;
     let isUnConfirmed = true;
 
-    const [userResult] = await pool.query(searchUserQs, [createdBy]);
-    if (userResult.length === 1) {
-      createdByName = userResult[0].name;
-    }
+    // // record申請者のuser
+    // // -> user.name
+    // const [userResult] = await pool.query(searchUserQs, [createdBy]);
+    // if (userResult.length === 1) {
+    //   createdByName = userResult[0].name;
+    // }
 
-    const [groupResult] = await pool.query(searchGroupQs, [applicationGroup]);
-    if (groupResult.length === 1) {
-      applicationGroupName = groupResult[0].name;
-    }
+    // // recordの申請部署(=申請者のプライマリ組織)
+    // // -> group_info.name
+    // const [groupResult] = await pool.query(searchGroupQs, [applicationGroup]);
+    // if (groupResult.length === 1) {
+    //   applicationGroupName = groupResult[0].name;
+    // }
 
-    const [itemResult] = await pool.query(searchThumbQs, [recordId]);
-    if (itemResult.length === 1) {
-      thumbNailItemId = itemResult[0].item_id;
-    }
+    // // recordのサムネイルファイル
+    // // -> record_item_file.item_id
+    // const [itemResult] = await pool.query(searchThumbQs, [recordId]);
+    // if (itemResult.length === 1) {
+    //   thumbNailItemId = itemResult[0].item_id;
+    // }
 
-    const [countResult] = await pool.query(countQs, [recordId]);
-    if (countResult.length === 1) {
-      commentCount = countResult[0]['cnt'];
-    }
+    // // recordについたコメントの数
+    // // -> count(record_comment)
+    // const [countResult] = await pool.query(countQs, [recordId]);
+    // if (countResult.length === 1) {
+    //   commentCount = countResult[0]['cnt'];
+    // }
 
-    const [lastResult] = await pool.query(searchLastQs, [user.user_id, recordId]);
-    if (lastResult.length === 1) {
+    // アクセスユーザの当該コメントに対する未読フラグ
+    // -> record_last_access.access_time と record.updated_at から計算
+    // const [lastResult] = await pool.query(searchLastQs, [user.user_id, recordId]);
+    const access_time = line.access_time;
+    if (access_time) {
       const updatedAtNum = Date.parse(updatedAt);
-      const accessTimeNum = Date.parse(lastResult[0].access_time);
+      const accessTimeNum = Date.parse(access_time);
       if (updatedAtNum <= accessTimeNum) {
         isUnConfirmed = false;
       }
     }
 
-    resObj.recordId = recordId;
-    resObj.title = line.title;
-    resObj.applicationGroup = applicationGroup;
     resObj.applicationGroupName = applicationGroupName;
-    resObj.createdBy = createdBy;
     resObj.createdByName = createdByName;
-    resObj.createAt = line.created_at;
     resObj.commentCount = commentCount;
     resObj.isUnConfirmed = isUnConfirmed;
     resObj.thumbNailItemId = thumbNailItemId;
-    resObj.updatedAt = updatedAt;
 
     items[i] = resObj;
   }
@@ -526,7 +534,7 @@ const acquireRecords = async (req, res, record_status, limitation) => {
   ts.push(Date.now());
   cs.push("count");
 
-  const fname = `acquireRecords(${record_status}, ${limitation}) (${recordResult.length})`;
+  const fname = `acquireRecords(${record_status}, ${limitation}) (${combinedResult.length})`;
   for (let i = 1; i < ts.length; ++i) {
     console.log(`[${fname}:${i}] ${ts[i] - ts[i - 1]}ms\t${cs[i]}`);
   }
