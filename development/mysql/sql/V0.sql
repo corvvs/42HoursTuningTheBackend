@@ -31,8 +31,6 @@ CREATE TABLE `record` (
     `updated_at` TIMESTAMP NOT NULL,
     PRIMARY KEY (`record_id`)
 );
-alter table record add index r_created_by(created_by);
-alter table record add index r_status(status);
 
 CREATE TABLE `record_item_file` (
     `item_id` bigint NOT NULL AUTO_INCREMENT,
@@ -42,7 +40,6 @@ CREATE TABLE `record_item_file` (
     `created_at` TIMESTAMP NOT NULL,
     PRIMARY KEY (`item_id`)
 );
-alter table record_item_file add index rif_linked_record_id(linked_record_id);
 
 CREATE TABLE `record_last_access` (
     `record_id` VARCHAR(64) NOT NULL,
@@ -59,7 +56,6 @@ CREATE TABLE `record_comment` (
     `created_at` TIMESTAMP NOT NULL,
     PRIMARY KEY (`comment_id`)
 );
-alter table record_comment add index rc_linked_record_id(linked_record_id);
 
 CREATE TABLE `category` (
     `category_id` bigint NOT NULL AUTO_INCREMENT,
