@@ -5,9 +5,12 @@ const jimp = require('jimp');
 
 const mysql = require('mysql2/promise');
 
-const sprint = (name) => {
-  console.log(`${Date.now()}: ${name}`);
-};
+
+
+let s_open = false;
+let s_closed = false;
+let n_open = 0;
+let n_closed = 0;
 
 const readFilePromise = (path) => {
   return new Promise((res, rej) => {
@@ -42,7 +45,7 @@ const mysqlOption = {
   password: 'backend',
   database: 'app',
   waitForConnections: true,
-  connectionLimit: 1800,
+  connectionLimit: 900,
 };
 const pool = mysql.createPool(mysqlOption);
 
@@ -455,6 +458,21 @@ ORDER BY
     os += `[${fname}:${i}] ${ts[i] - ts[i - 1]}ms\t${cs[i]}\n`;
   }
   console.log(os);
+  if (limitation === "all") {
+    if (record_status === "open") {
+      if (!s_open) {
+        s_open = true;
+        n_open = count;
+      }
+      console.log("n_open", n_open, " <-> ", count);
+    } else {
+      if (!s_closed) {
+        s_closed = true;
+        n_closed = count;
+      }
+      console.log("n_closed", n_closed, " <-> ", count);
+    }
+  }
 
   res.send({ count: count, items: items });
 };
@@ -477,6 +495,9 @@ const updateRecord = async (req, res) => {
     `${status}`,
     `${recordId}`,
   ]);
+
+  n_open -= 1;
+  n_closed += 1;
 
   res.send({});
 };
