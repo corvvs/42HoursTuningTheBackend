@@ -243,12 +243,12 @@ const getRecord = async (req, res) => {
  * - limitation:    "tome" | "all" | "mine"
  */
 const acquireRecords = async (req, res, record_status, limitation) => {
-  sprint(`start acquireRecords(${record_status}, ${limitation})`);
+  // sprint(`start acquireRecords(${record_status}, ${limitation})`);
 
 
-  sprint("start getLinkedUser");
+  // sprint("start getLinkedUser");
   let user = await getLinkedUser(req.headers);
-  sprint("end   getLinkedUser");
+  // sprint("end   getLinkedUser");
 
   if (!user) {
     res.status(401).send();
@@ -263,7 +263,7 @@ const acquireRecords = async (req, res, record_status, limitation) => {
     limit = 10;
   }
 
-  sprint("start precondition");
+  // sprint("start precondition");
   const {
     searchRecordQsCore, searchRecordQsCoreParams,
   } = await (async () => {
@@ -303,7 +303,7 @@ const acquireRecords = async (req, res, record_status, limitation) => {
       searchRecordQsCore, searchRecordQsCoreParams,
     };
   })();
-  sprint("end   precondition");
+  // sprint("end   precondition");
   const searchRecordQs = `
     select *
       from ${searchRecordQsCore}
@@ -314,11 +314,11 @@ const acquireRecords = async (req, res, record_status, limitation) => {
   const recordCountQsParams = searchRecordQsCoreParams;
   const countQueryPromise = pool.query(recordCountQs, recordCountQsParams)
 
-  sprint("start searchRecordQs");
+  // sprint("start searchRecordQs");
   const [recordResult] = await pool.query(
     searchRecordQs, searchRecordQsParams
   );
-  sprint("end   searchRecordQs");
+  // sprint("end   searchRecordQs");
 
   const items = Array(recordResult.length);
   let count = 0;
@@ -349,7 +349,7 @@ const acquireRecords = async (req, res, record_status, limitation) => {
   //  - access_time
   //  - 特殊:isUnConfirmed
 
-  sprint(`start item_query(${recordResult.length})`);
+  // sprint(`start item_query(${recordResult.length})`);
   for (let i = 0; i < recordResult.length; i++) {
     const resObj = {
       recordId: null,
@@ -419,14 +419,14 @@ const acquireRecords = async (req, res, record_status, limitation) => {
 
     items[i] = resObj;
   }
-  sprint(`end   item_query(${recordResult.length})`);
+  // sprint(`end   item_query(${recordResult.length})`);
 
   const [recordCountResult] = await countQueryPromise;
   if (recordCountResult.length === 1) {
     count = recordCountResult[0]['count(*)'];
   }
 
-  sprint(`end   acquireRecords(${record_status}, ${limitation})`);
+  // sprint(`end   acquireRecords(${record_status}, ${limitation})`);
   res.send({ count: count, items: items });
 };
 
@@ -592,9 +592,9 @@ for (let i = 0; i < categoryList.length; i++) {
 // GET categories/
 // カテゴリーの取得
 const getCategories = async (req, res) => {
-  sprint("start:  getLinkedUser");
+  // sprint("start:  getLinkedUser");
   let user = await getLinkedUser(req.headers);
-  sprint("end:    getLinkedUser");
+  // sprint("end:    getLinkedUser");
 
   if (!user) {
     res.status(401).send();
