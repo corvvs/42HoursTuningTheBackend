@@ -42,7 +42,7 @@ const mysqlOption = {
   password: 'backend',
   database: 'app',
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: 1800,
 };
 const pool = mysql.createPool(mysqlOption);
 
@@ -423,9 +423,9 @@ ORDER BY
 
     const access_time = line.access_time;
     if (access_time) {
-      const updatedAtNum = Date.parse(updatedAt);
-      const accessTimeNum = Date.parse(access_time);
-      if (updatedAtNum <= accessTimeNum) {
+      // const updatedAtNum = Date.parse(updatedAt);
+      // const accessTimeNum = Date.parse(access_time);
+      if (updatedAt <= access_time) {
         isUnConfirmed = false;
       }
     }
@@ -450,9 +450,11 @@ ORDER BY
   cs.push("count");
 
   const fname = `acquireRecords(${record_status}, ${limitation}) (${combinedResult.length})`;
+  let os = ""
   for (let i = 1; i < ts.length; ++i) {
-    console.log(`[${fname}:${i}] ${ts[i] - ts[i - 1]}ms\t${cs[i]}`);
+    os += `[${fname}:${i}] ${ts[i] - ts[i - 1]}ms\t${cs[i]}\n`;
   }
+  console.log(os);
 
   res.send({ count: count, items: items });
 };
