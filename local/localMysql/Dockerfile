@@ -5,5 +5,12 @@ COPY ./sql/V0.sql /docker-entrypoint-initdb.d/1_init.sql
 COPY ./sql/2_loadTestData.sql /docker-entrypoint-initdb.d/
 COPY ./data/* /docker-entrypoint-initdb.d/
 
+RUN apt-get -y update
+RUN apt-get -y install wget
+RUN wget https://github.com/percona/percona-toolkit/archive/3.0.5-test.tar.gz
+RUN tar zxvf 3.0.5-test.tar.gz
+RUN ./percona-toolkit-3.0.5-test/bin/pt-query-digest --version
+RUN mv ./percona-toolkit-3.0.5-test/bin/pt-query-digest /usr/local/bin/pt-query-digest
 
+#mysql -e "set global slow_query_log = ON;"
 CMD ["mysqld"]
