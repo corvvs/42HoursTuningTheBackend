@@ -7,6 +7,6 @@ RUN wget https://github.com/percona/percona-toolkit/archive/3.0.5-test.tar.gz
 RUN tar zxvf 3.0.5-test.tar.gz
 RUN ./percona-toolkit-3.0.5-test/bin/pt-query-digest --version
 RUN mv ./percona-toolkit-3.0.5-test/bin/pt-query-digest /usr/local/bin/pt-query-digest
-RUN wget http://mysqltuner.pl/ -O mysqltuner.pl
 
-CMD ["mysqld", "--innodb-log-file-size=16M"]
+
+CMD ["mysqld"]
