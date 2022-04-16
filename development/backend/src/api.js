@@ -355,7 +355,7 @@ const acquireRecords = async (req, res, record_status, limitation) => {
   count(distinct record_comment.comment_id)
                               AS comment_cnt
 FROM
-  (select * from ${searchRecordQsCore}) AS record
+  (select * from ${searchRecordQsCore} order by updated_at desc, record_id asc limit ? offset ?) AS record
 
   LEFT JOIN
   user
@@ -389,7 +389,6 @@ GROUP BY
 
 ORDER BY
   record.updated_at DESC, record.record_id ASC
-LIMIT ? OFFSET ?
 ;
 
   `;
