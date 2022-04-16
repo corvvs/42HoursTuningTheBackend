@@ -436,8 +436,9 @@ const acquireRecords = async (req, res, record_status, limitation) => {
   ts.push(Date.now());
   cs.push("count");
 
+  const fname = `acquireRecords(${record_status}, ${limitation}) (${recordResult.length})`;
   for (let i = 1; i < ts.length; ++i) {
-    console.log(`[${i}] ${ts[i] - ts[i - 1]}ms\t${cs[i]}`);
+    console.log(`[${fname}:${i}] ${ts[i] - ts[i - 1]}ms\t${cs[i]}`);
   }
   // sprint(`end   acquireRecords(${record_status}, ${limitation})`);
   res.send({ count: count, items: items });
