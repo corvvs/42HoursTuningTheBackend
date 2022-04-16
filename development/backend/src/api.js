@@ -97,33 +97,35 @@ const postRecords = async (req, res) => {
     return;
   }
 
+  const now = new Date();
   const userPrimary = rows[0];
   const newId = uuidv4();
-  await pool.query(
-    `insert into record
-    (record_id, status, title, detail, category_id, application_group, created_by, created_at, updated_at)
-    values (?, "open", ?, ?, ?, ?, ?, now(), now())`,
-    [
-      newId,
-      body.title,
-      body.detail,
-      body.categoryId,
-      userPrimary.group_id,
-      user.user_id,
-    ],
-  );
-
-  const now = new Date();
+  const record_fields = [
+    newId,
+    body.title,
+    body.detail,
+    body.categoryId,
+    userPrimary.group_id,
+    user.user_id,
+  ]
   const item_files = body.fileIdList.map(e => [
     newId, e.fileId, e.thumbFileId, now,
   ]);
-  await pool.query(
-    `insert into record_item_file
-      (linked_record_id, linked_file_id, linked_thumbnail_file_id, created_at)
-      values ?`,
-    [item_files],
-  );
-
+  const insert_result = await Promise.all([
+    pool.query(
+      `insert into record
+        (record_id, status, title, detail, category_id, application_group, created_by, created_at, updated_at)
+        values (?, "open", ?, ?, ?, ?, ?, now(), now())`,
+        [...record_fields],
+    ),
+    pool.query(
+      `insert into record_item_file
+        (linked_record_id, linked_file_id, linked_thumbnail_file_id, created_at)
+        values ?`,
+      [item_files],
+    ),
+  ]);
+  // console.log(insert_result);
   res.send({ recordId: newId });
 };
 
