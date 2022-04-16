@@ -109,7 +109,7 @@ const postRecords = async (req, res) => {
   const item_files = body.fileIdList.map(e => [
     newId, e.fileId, e.thumbFileId, now,
   ]);
-  const insert_result = await Promise.all([
+  await Promise.all([
     pool.query(
       `insert into record
         (record_id, status, title, detail, category_id, application_group, created_by, created_at, updated_at)
@@ -322,21 +322,13 @@ const acquireRecords = async (req, res, record_status, limitation) => {
       searchRecordQsCore, searchRecordQsCoreParams,
     };
   })();
-  // sprint("end   precondition");
   ts.push(Date.now());
   cs.push("precond");
-  const searchRecordQs = `
-    select *
-      from ${searchRecordQsCore}
-      order by updated_at desc, record_id asc
-      limit ? offset ?`;
   const searchRecordQsParams = [...searchRecordQsCoreParams, limit, offset];
   const recordCountQs = `select count(*) from ${searchRecordQsCore}`;
   const recordCountQsParams = searchRecordQsCoreParams;
   const countQueryPromise = pool.query(recordCountQs, recordCountQsParams)
 
-  console.log("searchRecordQsCore", searchRecordQsCore);
-  console.log("searchRecordQsParams", searchRecordQsParams);
   const combinedQueryQs = `
 
   SELECT
@@ -397,58 +389,13 @@ ORDER BY
     combinedQueryQs, searchRecordQsParams
   );
 
-  // sprint("start searchRecordQs");
-  // const [recordResult] = await pool.query(
-  //   searchRecordQs, searchRecordQsParams
-  // );
-  // sprint("end   searchRecordQs");
-
   ts.push(Date.now());
   cs.push("body");
   const items = Array(combinedResult.length);
   let count = 0;
-  const searchUserQs
-    = 'select * from user where user_id = ?';
-  const searchGroupQs
-    = 'select * from group_info where group_id = ?';
-  const searchThumbQs
-    = 'select * from record_item_file where linked_record_id = ? order by item_id asc limit 1';
-  const countQs
-    = 'select count(*) AS cnt from record_comment where linked_record_id = ?';
-  const searchLastQs
-    = 'select * from record_last_access where user_id = ? and record_id = ?';
 
-  // - record
-  //  - record_id
-  //  - created_by
-  //  - created_at
-  //  - updated_at
-  //  - application_group
-  //  - title
-  // - user
-  //  - name
-  // - group_info
-  //  - name
-  // - record_item_file
-  //  - item_id
-  // - record_comment
-  //  - cnt
-  //    - 既定値が0であることに注意
-  // - record_last_access
-  //  - access_time
-  //  - 特殊:isUnConfirmed
-
-  // record.created_by = user.user_id
-  // record.application_group = group_info.group_id
-  // record.record_id = record_item_file.linked_record_id
-  // record.record_id = record_comment.linked_record_id
-  // record.record_id = record_last_access.record_id
-  // user.user_id = record_last_access.user_id
-
-  // sprint(`start item_query(${recordResult.length})`);
   for (let i = 0; i < combinedResult.length; i++) {
     const line = combinedResult[i];
-    // console.log(`line[${i}]`, line);
     const recordId = line.record_id;
     const createdBy = line.created_by;
     const applicationGroup = line.application_group;
@@ -474,37 +421,6 @@ ORDER BY
     let commentCount = line.comment_cnt;
     let isUnConfirmed = true;
 
-    // // record申請者のuser
-    // // -> user.name
-    // const [userResult] = await pool.query(searchUserQs, [createdBy]);
-    // if (userResult.length === 1) {
-    //   createdByName = userResult[0].name;
-    // }
-
-    // // recordの申請部署(=申請者のプライマリ組織)
-    // // -> group_info.name
-    // const [groupResult] = await pool.query(searchGroupQs, [applicationGroup]);
-    // if (groupResult.length === 1) {
-    //   applicationGroupName = groupResult[0].name;
-    // }
-
-    // // recordのサムネイルファイル
-    // // -> record_item_file.item_id
-    // const [itemResult] = await pool.query(searchThumbQs, [recordId]);
-    // if (itemResult.length === 1) {
-    //   thumbNailItemId = itemResult[0].item_id;
-    // }
-
-    // // recordについたコメントの数
-    // // -> count(record_comment)
-    // const [countResult] = await pool.query(countQs, [recordId]);
-    // if (countResult.length === 1) {
-    //   commentCount = countResult[0]['cnt'];
-    // }
-
-    // アクセスユーザの当該コメントに対する未読フラグ
-    // -> record_last_access.access_time と record.updated_at から計算
-    // const [lastResult] = await pool.query(searchLastQs, [user.user_id, recordId]);
     const access_time = line.access_time;
     if (access_time) {
       const updatedAtNum = Date.parse(updatedAt);
@@ -522,7 +438,7 @@ ORDER BY
 
     items[i] = resObj;
   }
-  // sprint(`end   item_query(${recordResult.length})`);
+
   ts.push(Date.now());
   cs.push("aggre");
 
@@ -537,7 +453,7 @@ ORDER BY
   for (let i = 1; i < ts.length; ++i) {
     console.log(`[${fname}:${i}] ${ts[i] - ts[i - 1]}ms\t${cs[i]}`);
   }
-  // sprint(`end   acquireRecords(${record_status}, ${limitation})`);
+
   res.send({ count: count, items: items });
 };
 
@@ -619,8 +535,6 @@ const getComments = async (req, res) => {
   // - user
   //   - name
 
-
-
   const [commentResult] = await pool.query(commentQs, [recordId]);
 
   const commentList = Array(commentResult.length);
@@ -654,13 +568,8 @@ const getComments = async (req, res) => {
 // POST records/{recordId}/comments
 // コメントの投稿
 const postComments = async (req, res) => {
-  const ts = [Date.now()];
-  const cs = [""];
 
   let user = await getLinkedUser(req.headers);
-
-  ts.push(Date.now());
-  cs.push("認証");
 
   if (!user) {
     res.status(401).send();
@@ -686,13 +595,6 @@ const postComments = async (req, res) => {
     ),
   ]);
 
-  ts.push(Date.now());
-  cs.push("insert2");
-  const fname = `postComments (${recordId}, ${user.user_id})`;
-  for (let i = 1; i < ts.length; ++i) {
-    console.log(`[${fname}:${i}] ${ts[i] - ts[i - 1]}ms\t${cs[i]}`);
-  }
-  
   res.send({});
 };
 
