@@ -83,8 +83,6 @@ const postRecords = async (req, res) => {
     return;
   }
 
-  mylog(user);
-
   const body = req.body;
 
   let [rows] = await pool.query(
@@ -209,8 +207,8 @@ const getRecord = async (req, res) => {
 
   const searchItemQs = `select * from record_item_file where linked_record_id = ? order by item_id asc`;
   const [itemResult] = await pool.query(searchItemQs, [line.record_id]);
-  mylog('itemResult');
-  mylog(itemResult);
+  // mylog('itemResult');
+  // mylog(itemResult);
 
   const searchFileQs = `select * from file where file_id = ?`;
   for (let i = 0; i < itemResult.length; i++) {
@@ -245,6 +243,9 @@ const getRecord = async (req, res) => {
  * - limitation:    "tome" | "all" | "mine"
  */
 const acquireRecords = async (req, res, record_status, limitation) => {
+  sprint(`start acquireRecords(${record_status}, ${limitation})`);
+
+
   sprint("start getLinkedUser");
   let user = await getLinkedUser(req.headers);
   sprint("end   getLinkedUser");
@@ -262,6 +263,7 @@ const acquireRecords = async (req, res, record_status, limitation) => {
     limit = 10;
   }
 
+  sprint("start precondition");
   const {
     searchRecordQsCore, searchRecordQsCoreParams,
   } = await (async () => {
@@ -301,6 +303,7 @@ const acquireRecords = async (req, res, record_status, limitation) => {
       searchRecordQsCore, searchRecordQsCoreParams,
     };
   })();
+  sprint("end   precondition");
   const searchRecordQs = `
     select *
       from ${searchRecordQsCore}
@@ -309,6 +312,7 @@ const acquireRecords = async (req, res, record_status, limitation) => {
   const searchRecordQsParams = [...searchRecordQsCoreParams, limit, offset];
   const recordCountQs = `select count(*) from ${searchRecordQsCore}`;
   const recordCountQsParams = searchRecordQsCoreParams;
+  const countQueryPromise = pool.query(recordCountQs, recordCountQsParams)
 
   sprint("start searchRecordQs");
   const [recordResult] = await pool.query(
@@ -345,6 +349,7 @@ const acquireRecords = async (req, res, record_status, limitation) => {
   //  - access_time
   //  - 特殊:isUnConfirmed
 
+  sprint(`start item_query(${recordResult.length})`);
   for (let i = 0; i < recordResult.length; i++) {
     const resObj = {
       recordId: null,
@@ -414,12 +419,14 @@ const acquireRecords = async (req, res, record_status, limitation) => {
 
     items[i] = resObj;
   }
+  sprint(`end   item_query(${recordResult.length})`);
 
-  const [recordCountResult] = await pool.query(recordCountQs, recordCountQsParams);
+  const [recordCountResult] = await countQueryPromise;
   if (recordCountResult.length === 1) {
     count = recordCountResult[0]['count(*)'];
   }
 
+  sprint(`end   acquireRecords(${record_status}, ${limitation})`);
   res.send({ count: count, items: items });
 };
 
@@ -654,9 +661,7 @@ const getRecordItemFile = async (req, res) => {
   }
 
   const recordId = req.params.recordId;
-  mylog(recordId);
   const itemId = Number(req.params.itemId);
-  mylog(itemId);
 
   const [rows] = await pool.query(
     `select f.name, f.path from record_item_file r
@@ -695,9 +700,7 @@ const getRecordItemFileThumbnail = async (req, res) => {
   }
 
   const recordId = req.params.recordId;
-  mylog(recordId);
   const itemId = Number(req.params.itemId);
-  mylog(itemId);
 
   const [rows] = await pool.query(
     `select f.name, f.path from record_item_file r
