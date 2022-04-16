@@ -251,6 +251,8 @@ const acquireRecords = async (req, res, record_status, limitation) => {
   // sprint("start getLinkedUser");
   let user = await getLinkedUser(req.headers);
   // sprint("end   getLinkedUser");
+  ts.push(Date.now());
+  cs.push("認証");
 
   if (!user) {
     res.status(401).send();
@@ -267,10 +269,10 @@ const acquireRecords = async (req, res, record_status, limitation) => {
 
   // sprint("start precondition");
   ts.push(Date.now());
-  cs.push("認証");
+  cs.push("offset-limit");
   const {
     searchRecordQsCore, searchRecordQsCoreParams,
-  } = await (async () => {
+  } = (() => {
     let searchRecordQsCore = `record where status = ?`;
     const searchRecordQsCoreParams = [record_status];
 
@@ -356,6 +358,16 @@ const acquireRecords = async (req, res, record_status, limitation) => {
   // - record_last_access
   //  - access_time
   //  - 特殊:isUnConfirmed
+
+  // record.created_by = user.user_id
+  // record.application_group = group_info.group_id
+  // record.record_id = record_item_file.linked_record_id
+  // record.record_id = record_comment.linked_record_id
+  // record.record_id = record_last_access.record_id
+  // user.user_id = record_last_access.user_id
+
+  
+  
 
   // sprint(`start item_query(${recordResult.length})`);
   for (let i = 0; i < recordResult.length; i++) {
@@ -559,7 +571,13 @@ const getComments = async (req, res) => {
 // POST records/{recordId}/comments
 // コメントの投稿
 const postComments = async (req, res) => {
+  const ts = [Date.now()];
+  const cs = [""];
+
   let user = await getLinkedUser(req.headers);
+
+  ts.push(Date.now());
+  cs.push("認証");
 
   if (!user) {
     res.status(401).send();
@@ -569,20 +587,29 @@ const postComments = async (req, res) => {
   const recordId = req.params.recordId;
   const value = req.body.value;
 
-  await pool.query(
-    `
-    insert into record_comment
-    (linked_record_id, value, created_by, created_at)
-    values (?,?,?, now());`,
-    [`${recordId}`, `${value}`, user.user_id],
-  );
+  await Promise.all([
+    pool.query(
+      `
+      insert into record_comment
+      (linked_record_id, value, created_by, created_at)
+      values (?,?,?, now());`,
+      [`${recordId}`, `${value}`, user.user_id],
+    ),
 
-  await pool.query(
-    `
-    update record set updated_at = now() where record_id = ?;`,
-    [`${recordId}`],
-  );
+    pool.query(
+      `
+      update record set updated_at = now() where record_id = ?;`,
+      [`${recordId}`],
+    ),
+  ]);
 
+  ts.push(Date.now());
+  cs.push("insert2");
+  const fname = `postComments (${recordId}, ${user.user_id})`;
+  for (let i = 1; i < ts.length; ++i) {
+    console.log(`[${fname}:${i}] ${ts[i] - ts[i - 1]}ms\t${cs[i]}`);
+  }
+  
   res.send({});
 };
 
