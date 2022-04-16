@@ -276,10 +276,9 @@ const acquireRecords = async (req, res, record_status, limitation) => {
     } else if (limitation === "tome") {
       // - ユーザが所属するグループの一覧を取得し
       // - そのグループIDが上記一覧のいずれかを含む category_group を取得する
-      const targetCategoryAppGroupList = [];
-      const searchTargetQs = `
+      searchRecordQsCore += ` and (category_id, application_group) in (
         SELECT
-          *
+        category_id, application_group
         FROM
           category_group
         WHERE
@@ -293,27 +292,8 @@ const acquireRecords = async (req, res, record_status, limitation) => {
             WHERE
               user_id = ?
           )
-      `;
-      const [targetResult] = await pool.query(searchTargetQs, [user.user_id]);
-      for (let j = 0; j < targetResult.length; j++) {
-        const targetLine = targetResult[j];
-        targetCategoryAppGroupList.push({
-          categoryId: targetLine.category_id,
-          applicationGroup: targetLine.application_group,
-        });
-      }
-      // TODO: これもJOINにできそう
-      searchRecordQsCore += ` and (category_id, application_group) in (`;
-      for (let i = 0; i < targetCategoryAppGroupList.length; i++) {
-        if (i !== 0) {
-          searchRecordQsCore += ', (?, ?)';
-        } else {
-          searchRecordQsCore += ' (?, ?)';
-        }
-        searchRecordQsCoreParams.push(targetCategoryAppGroupList[i].categoryId);
-        searchRecordQsCoreParams.push(targetCategoryAppGroupList[i].applicationGroup);
-      }
-      searchRecordQsCore += ' )';
+      )`;
+      searchRecordQsCoreParams.push(user.user_id);
     }
     ///////////////////////////////////////////////////////////////
 
