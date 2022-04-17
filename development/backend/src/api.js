@@ -255,13 +255,9 @@ const getRecord = async (req, res) => {
  */
 const acquireRecords = async (req, res, record_status, limitation) => {
   // sprint(`start acquireRecords(${record_status}, ${limitation})`);
-  const ts = [Date.now()];
-  const cs = [""];
   // sprint("start getLinkedUser");
   let user = await getLinkedUser(req.headers);
   // sprint("end   getLinkedUser");
-  ts.push(Date.now());
-  cs.push("認証");
 
   if (!user) {
     res.status(401).send();
@@ -277,8 +273,6 @@ const acquireRecords = async (req, res, record_status, limitation) => {
   }
 
   // sprint("start precondition");
-  ts.push(Date.now());
-  cs.push("offset-limit");
   const {
     searchRecordQsCore, searchRecordQsCoreParams,
   } = (() => {
@@ -318,8 +312,6 @@ const acquireRecords = async (req, res, record_status, limitation) => {
       searchRecordQsCore, searchRecordQsCoreParams,
     };
   })();
-  ts.push(Date.now());
-  cs.push("precond");
   const searchRecordQsParams = [...searchRecordQsCoreParams, limit, offset];
   const recordCountQs = `select count(*) from ${searchRecordQsCore}`;
   const recordCountQsParams = searchRecordQsCoreParams;
@@ -392,8 +384,6 @@ ORDER BY
     combinedQueryQs, searchRecordQsParams
   );
 
-  ts.push(Date.now());
-  cs.push("body");
   const items = Array(combinedResult.length);
   let count = 0;
 
@@ -442,22 +432,10 @@ ORDER BY
     items[i] = resObj;
   }
 
-  ts.push(Date.now());
-  cs.push("aggre");
-
   const [recordCountResult] = await countQueryPromise;
   if (recordCountResult.length === 1) {
     count = recordCountResult[0]['count(*)'];
   }
-  ts.push(Date.now());
-  cs.push("count");
-
-  const fname = `acquireRecords(${record_status}, ${limitation}) (${combinedResult.length})`;
-  let os = ""
-  for (let i = 1; i < ts.length; ++i) {
-    os += `[${fname}:${i}] ${ts[i] - ts[i - 1]}ms\t${cs[i]}\n`;
-  }
-  console.log(os);
 
   res.send({ count: count, items: items });
 };
