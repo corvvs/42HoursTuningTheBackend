@@ -42,7 +42,7 @@ const mysqlOption = {
   password: 'backend',
   database: 'app',
   waitForConnections: true,
-  connectionLimit: 200,
+  connectionLimit: 300,
 };
 const pool = mysql.createPool(mysqlOption);
 
@@ -62,7 +62,7 @@ const getLinkedUser = async (headers) => {
   const qs = `select linked_user_id from session where value = ? limit 2`;
   const [rows] = await pool.query(qs, [target]);
   if (rows.length !== 1) {
-    // mylog('セッションが見つかりませんでした。');
+    mylog('セッションが見つかりませんでした。');
     return undefined;
   }
 
@@ -84,7 +84,7 @@ const postRecords = async (req, res) => {
   const body = req.body;
 
   let [rows] = await pool.query(
-    `select * from group_member where user_id = ?
+    `select group_id from group_member where user_id = ?
     AND is_primary = true`,
     [user.user_id],
   );
@@ -245,7 +245,7 @@ const getRecord = async (req, res) => {
 	VALUES
 	(?, ?, now())
 	ON DUPLICATE KEY UPDATE access_time = now()`,
-    [`${recordId}`, `${user.user_id}`],
+    [recordId, user.user_id],
   );
 
   res.send(recordInfo);
@@ -347,7 +347,14 @@ const acquireRecords = async (req, res, record_status, limitation) => {
   count(distinct record_comment.comment_id)
                               AS comment_cnt
 FROM
-  (select * from ${searchRecordQsCore} order by updated_at desc, record_id asc limit ? offset ?) AS record
+  (select
+      record_id,
+      created_by,
+      created_at,
+      updated_at,
+      application_group,
+      title
+  from ${searchRecordQsCore} order by updated_at desc, record_id asc limit ? offset ?) AS record
 
   LEFT JOIN
   user
@@ -733,14 +740,20 @@ const getRecordItemFileThumbnail = async (req, res) => {
   const itemId = Number(req.params.itemId);
 
   const [rows] = await pool.query(
-    `select f.name, f.path from record_item_file r
-    inner join file f
-    on
-    r.linked_record_id = ?
-    and
-    r.item_id = ?
-    and
-    r.linked_thumbnail_file_id = f.file_id`,
+    `
+      select
+        f.name, f.path
+      from
+        record_item_file r
+          inner join
+        file f
+          on
+        r.linked_record_id = ?
+          and
+        r.item_id = ?
+          and
+        r.linked_thumbnail_file_id = f.file_id
+    `,
     [`${recordId}`, `${itemId}`],
   );
 
