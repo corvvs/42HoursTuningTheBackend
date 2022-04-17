@@ -1,9 +1,7 @@
-const compression = require('compression');
-const express = require('express');
-const app = express();
-
-app.use(compression());
-app.use(express.json({limit: '10mb'}));
+const fastify = require('fastify');
+const app = fastify({
+  bodyLimit: 10485760,
+});
 
 const api = require("./api");
 
@@ -131,5 +129,11 @@ app.get('/api/client/records/:recordId/files/:itemId/thumbnail', async (req, res
 })
 
 
-app.listen(8000, () => console.log('listening on port 8000...'))
-
+// app.listen(8000, () => console.log('listening on port 8000...'))
+app.listen(8000, '0.0.0.0', function (err, address) {
+  if (err) {
+    app.log.error(err)
+    process.exit(1)
+  }
+  app.log.info(`listening on port 8000...`)
+})
