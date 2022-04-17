@@ -5,10 +5,6 @@ const jimp = require('jimp');
 
 const mysql = require('mysql2/promise');
 
-const sprint = (name) => {
-  console.log(`${Date.now()}: ${name}`);
-};
-
 const readFilePromise = (path) => {
   return new Promise((res, rej) => {
     fs.readFile(path, (err, data) => {
@@ -549,28 +545,16 @@ const getComments = async (req, res) => {
   const commentList = Array(commentResult.length);
 
   for (let i = 0; i < commentResult.length; i++) {
-    let commentInfo = {
-      commentId: '',
-      value: '',
-      createdBy: null,
-      createdByName: null,
-      createdByPrimaryGroupName: null,
-      createdAt: null,
-    };
     const line = commentResult[i];
-    commentInfo.commentId = line["comment_id"];
-    commentInfo.value     = line["value"];
-    commentInfo.createdBy = line["created_by"];
-    commentInfo.createdAt = line["created_at"];
-    if (typeof line["group_name"] === "string") {
-      commentInfo.createdByPrimaryGroupName = line["group_name"];
-    }
-    if (typeof line["user_name"] === "string") {
-      commentInfo.createdByName = line["user_name"];
-    }
-    commentList[i] = commentInfo;
+    commentList[i] = {
+      commentId: line["comment_id"],
+      value: line["value"],
+      createdBy: line["created_by"],
+      createdByName: line["user_name"],
+      createdByPrimaryGroupName: line["group_name"],
+      createdAt: line["created_at"],
+    };
   }
-
   res.send({ items: commentList });
 };
 
@@ -668,6 +652,7 @@ const postFiles = async (req, res) => {
 
   const size = image.bitmap.width < image.bitmap.height ? image.bitmap.width : image.bitmap.height;
   await image.cover(size, size);
+  await image.quality(30);
 
   const thumb_path = `${filePath}${newThumbId}_thumb_${name}`;
   await image.writeAsync(thumb_path);
