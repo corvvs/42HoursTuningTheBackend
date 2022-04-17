@@ -21,6 +21,11 @@ services:
       build:
         context: ./localMysql
         dockerfile: Dockerfile
+      cap_add:
+        - SYS_NICE
+      ports:
+        - 13306:3306
+      platform: linux/x86_64
       environment:
         MYSQL_ALLOW_EMPTY_PASSWORD: 1
         MYSQL_DATABASE: "app"

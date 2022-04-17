@@ -28,6 +28,8 @@ services:
       build:
         context: ./mysql
         dockerfile: Dockerfile
+      cap_add:
+        - SYS_NICE
       environment:
         MYSQL_ALLOW_EMPTY_PASSWORD: 1
         MYSQL_DATABASE: "app"
